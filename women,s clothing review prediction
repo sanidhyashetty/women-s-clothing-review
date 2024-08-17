@@ -1,0 +1,77 @@
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, classification_report
+import nltk
+from nltk.corpus import stopwords
+import string
+
+# Download stopwords if not already present
+nltk.download('stopwords')
+
+# Step 1: Load the data into a pandas DataFrame
+stop_words = set(stopwords.words('english'))
+data = pd.read_csv('https://raw.githubusercontent.com/YBI-Foundation/Teaching-Data/main/Women%20Clothing%20E-Commerce%20Review.csv')
+print(data.head())
+
+# Step 2: Preprocess the text data
+def preprocess_text(text):
+    if isinstance(text, str):
+        # Remove punctuation and convert to lowercase
+        text = text.lower().translate(str.maketrans('', '', string.punctuation))
+        # Tokenize and remove stopwords
+        tokens = [word for word in text.split() if word not in stop_words]
+        return ' '.join(tokens)
+    else:
+        return ""
+
+# Handle missing values and preprocess
+data['Review'] = data['Review'].fillna('')
+data['Category'] = pd.to_numeric(data['Category'], errors='coerce')  # Convert to numeric
+data['Category'] = data['Category'].fillna(0).astype(int)  # Fill NaNs with 0 and convert to int
+data['processed_Review'] = data['Review'].apply(preprocess_text)
+
+print(data.columns)
+print(data.info())
+
+# Step 3: Define features and target variable
+X = data['processed_Review']
+y = data['Category']
+
+# Step 4: Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+
+# Step 5: Feature extraction using TF-IDF
+vectorizer = TfidfVectorizer()
+X_train_tfidf = vectorizer.fit_transform(X_train)
+X_test_tfidf = vectorizer.transform(X_test)
+
+# Step 6: Train the Multinomial Naive Bayes model
+model = MultinomialNB()
+model.fit(X_train_tfidf, y_train)
+
+# Step 7: Predict and evaluate the model
+y_pred = model.predict(X_test_tfidf)
+accuracy = accuracy_score(y_test, y_pred)
+report = classification_report(y_test, y_pred)
+
+print(f"Accuracy: {accuracy:.2f}")
+print("\nClassification Report:")
+print(report)
+
+# Step 8: Function to predict the sentiment of a review
+def predict_review_sentiment(review):
+    # Preprocess the review text
+    processed_review = preprocess_text(review)
+    # Transform the review using the same TF-IDF vectorizer
+    review_tfidf = vectorizer.transform([processed_review])
+    # Predict using the trained model
+    prediction = model.predict(review_tfidf)
+    # Return the predicted category
+    return prediction[0]
+
+# Example usage
+example_review = "This dress is fantastic! The material is high quality and the fit is perfect."
+predicted_sentiment = predict_review_sentiment(example_review)
+print(f"Predicted sentiment for the review: {example_review}")
